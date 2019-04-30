@@ -2,69 +2,109 @@ import argparse
 import json
 import pickle
 import re
-from lxml import html
-import requests
 import sys
+
+import requests
+from lxml import html
+
 
 DEFAULT_PICKLE = 'weather.pickle'
 
 PARSER = argparse.ArgumentParser()
 PARSER.add_argument('-p', '--pickled', action='store_true', default=False)
-PARSER.add_argument('-f', '--file', default=DEFAULT_PICKLE)
-
-pickled = False
+PARSER.add_argument('-f', '--filename', default=DEFAULT_PICKLE)
+PARSER.add_argument('-c', '--cache',action='store_true', default=False)
 
 WEBPAGE = 'https://weather.com/weather/today/l/USAZ0166:1:US'
 JSON_RIP_PATTERN = r'var adaptorParams = (?P<JSON_DUMP>\{.*\});$'
 JSON_RIP = re.compile(JSON_RIP_PATTERN)
 
+DAY_ABBREV = {'Monday': 'Mon', 'Tuesday': 'Tue', 'Wednesday': 'Wed',
+              'Thursday': 'Thu', 'Friday': 'Fri', 'Saturday': 'Sat',
+              'Sunday': 'Sun'}
+
 def main(args=None):
+    outstring = ''
+    page = None
+
     if args is not None:
         pickled = args.pickled
+        cache = args.cache
+
+        if cache and pickled:
+            print('bad arguments - cannot cache page and use pickle')
+            return outstring
     else:
         pickled = False
-    
-    page = None
+        cache = False
+
     if pickled:
         page = unpickle_page(args.filename)
+
     else:
         try:
             page = get_web_page(WEBPAGE)
         except:
             print("Request Exception {}".format(sys.exc_info()[0]))
-            page  = unpickle_page(args.filename)
-            
+            page = unpickle_page(args.filename)
 
+    if cache:
+        pickle_page(args.filename, page)
 
     json_data = get_JSON(page)
-    # print(page)
-    # print(json_data)
 
     data = json.loads(json_data)
-    # print(data['dailyForecast']['data']['vt1dailyForecast'][1:])
-    # print(data['observation']['data'])
-    # print(data['dailyForecast']['data']['vt1dailyForecast'][0])
 
     _current_temp = data['observation']['data']['vt1observation']['temperature']
     _current_max_temp = data['observation']['data']['vt1observation']['temperatureMaxSince7am']
-    _current_wind_speed = data['observation']['data']['vt1observation']['windSpeed']
+    # TODO remove, unused
+    # _current_wind_speed = data['observation']['data']['vt1observation']['windSpeed']
+
     # descriptor of the current weather
     _current_phrase = data['observation']['data']['vt1observation']['phrase']
 
     _forecast = []
-    for day in data['dailyForecast']['data']['vt1dailyForecast'][1:]:
-        _forecast.append({"day":day['dayOfWeek'], 'temp':day['day']['temperature'], 'phrase':day['day']['phrase']})
+    outstring += 'CURRENT: {} {} HI:{}    '.format(_current_phrase,
+                                                   _current_temp,
+                                                   _current_max_temp)
 
-    print('Temp: {}\nMax: {}\nWind: {}\n{}'.format(_current_temp, _current_max_temp, _current_wind_speed, _current_phrase))
-    print(_forecast)
+    for day in data['dailyForecast']['data']['vt1dailyForecast'][1:6]:
+        outstring += '{}: {}-{}     '.format(DAY_ABBREV[day['dayOfWeek']],
+                                             day['day']['phrase'],
+                                             day['day']['temperature'])
 
+        # TODO remove legacy code
+        # _forecast.append({"day":day['dayOfWeek'], 'temp':day['day']['temperature'], 'phrase':day['day']['phrase']})
 
-def unpickle_page(filename = None):
+    # print('Temp: {}\nMax: {}\nWind: {}\n{}'.format(_current_temp, _current_max_temp, _current_wind_speed, _current_phrase))
+    # print(outstring)
+
+    return outstring
+
+def unpickle_page(filename=None):
+    """
+    unpickle a page for use later in the function
+    Params:
+        filename - the path to the file to use. Defaults to None
+    """
+    page = ''
     if filename is None:
         filename = DEFAULT_PICKLE
 
     with open(filename, 'rb') as f:
-        page = pickle.load(f).text
+        page = pickle.load(f)
+
+    return page
+
+def pickle_page(filename=None, page=None):
+    """
+    pickle / cache a page under the provided filename
+    """
+    if filename is None:
+        filename = DEFAULT_PICKLE
+
+    with open(filename, 'wb') as f:
+        pickle.dump(page, f)
 
 def get_web_page(address):
     """

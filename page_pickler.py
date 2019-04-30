@@ -25,6 +25,7 @@ def pickle_url(url, name='', render=0):
     if page.ok:
         with  open(filename, 'wb') as f:
             outdata = pickle.dump(page, f)
+        print('page {} pickled under {}'.format(url, filename))
     else:
         print('Status Code: {}\npage {} unpickled'.format(page.status_code, url))
 

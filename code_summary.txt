@@ -1,0 +1,12 @@
+Written code Modules:
+master.py
+sports_scrapper.py
+weather_scrapper.py
+traffic_scrapper.py
+page_pickler.py - a utility for caching webpages
+
+Requirements:
+rpi-rgb-led-matrix - our API for the led display, included in it's own folder
+   python 3 bindings must be built to allow the code to interface
+webdriver, for selenium
+written primarily in python 3
